@@ -1,0 +1,276 @@
+{
+  "name": "Comment to DM · API privada",
+  "nodes": [
+    {
+      "id": "9c4584b1-28f7-5ae1-ad99-08fe7a6721ff",
+      "name": "Panel privado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "comment-to-dm-admin",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__ADMIN_CREDENTIAL_ID__",
+          "name": "Comment to DM · Panel"
+        }
+      },
+      "webhookId": "comment-to-dm-panel-api-workflow-post"
+    },
+    {
+      "id": "dac6c427-5657-5a42-8081-64114a23a50c",
+      "name": "Validar solicitud panel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const b=$input.first().json.body||{}; const action=String(b.action||''); if(!['list','save','toggle','media'].includes(action))return [{json:{action:'invalid',data:{}}}]; const cursor=String(b.data?.cursor||''); if(cursor.length>2048||!/^[A-Za-z0-9_=-]*$/.test(cursor))return [{json:{action:'invalid',data:{}}}]; return [{json:{action,data:b.data||{},cursor}}];"
+      }
+    },
+    {
+      "id": "186e4548-26a1-5c32-83ac-f2130a6be417",
+      "name": "Consultar Instagram",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "operation": "equal",
+              "value2": "media"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2dd548a6-c0d0-5161-b160-782936dbf8a6",
+      "name": "Publicaciones de la cuenta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        -160
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://graph.instagram.com/__GRAPH_VERSION__/me/media?fields=id,permalink,caption,timestamp,media_type&limit=100' + ($json.cursor ? '&after=' + encodeURIComponent($json.cursor) : '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__META_CREDENTIAL_ID__",
+          "name": "Comment to DM · Instagram"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "09e17d86-a38c-5ac4-9fa4-f573be176a92",
+      "name": "Sanear publicaciones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "const r=$input.first().json,b=r.body||r; if(r.statusCode!==200||!Array.isArray(b.data))return [{json:{ok:false,status:502,error:'No se pudo consultar Instagram. Revisa la conexión de la cuenta.'}}]; return [{json:{ok:true,media:b.data.map(m=>({id:String(m.id),permalink:m.permalink,caption:String(m.caption||'').slice(0,500),timestamp:m.timestamp,media_type:m.media_type})),cursor:b.paging?.next?b.paging?.cursors?.after||null:null}}];"
+      }
+    },
+    {
+      "id": "a04357e8-ee9b-5773-97d7-7e37e9f6d05f",
+      "name": "Administrar configuracion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        160
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_admin",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({p_action:$json.action,p_data:$json.data}) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "ce3eeb3e-878d-5b5a-bafe-b51e0a3018e9",
+      "name": "Sanear configuracion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        160
+      ],
+      "parameters": {
+        "jsCode": "const r=$input.first().json,b=r.body||r; return [{json:r.statusCode===200 && typeof b.ok==='boolean'?b:{ok:false,status:502,error:'No se pudo guardar o leer la configuración.'}}];"
+      }
+    },
+    {
+      "id": "999b5e02-6a41-5759-a326-cd1e76e514e6",
+      "name": "Responder panel",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": "={{ $json.ok ? 200 : ($json.status || 500) }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Panel privado": {
+      "main": [
+        [
+          {
+            "node": "Validar solicitud panel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar solicitud panel": {
+      "main": [
+        [
+          {
+            "node": "Consultar Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicaciones de la cuenta": {
+      "main": [
+        [
+          {
+            "node": "Sanear publicaciones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanear publicaciones": {
+      "main": [
+        [
+          {
+            "node": "Responder panel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Administrar configuracion": {
+      "main": [
+        [
+          {
+            "node": "Sanear configuracion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanear configuracion": {
+      "main": [
+        [
+          {
+            "node": "Responder panel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Instagram": {
+      "main": [
+        [
+          {
+            "node": "Publicaciones de la cuenta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Administrar configuracion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 60
+  }
+}

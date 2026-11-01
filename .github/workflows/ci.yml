@@ -1,0 +1,19 @@
+name: test-and-security
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24.22.2
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: docker pull node:24.22.2-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+      - run: npm test
+      - run: npm run test:database
+      - run: npm run scan
+      - run: npm audit --audit-level=high

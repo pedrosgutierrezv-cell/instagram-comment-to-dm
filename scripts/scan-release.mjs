@@ -1,0 +1,10 @@
+import {readdir,readFile,lstat} from 'node:fs/promises';
+import {resolve,relative,sep} from 'node:path';
+const root=resolve(new URL('../',import.meta.url).pathname);
+const ignored=new Set(['node_modules','.git','state','coverage']);
+const findings=[];let count=0;
+let privateNeedles=[];
+if(process.env.PRIVATE_SCAN_FILE){const p=resolve(process.env.PRIVATE_SCAN_FILE);if(p.startsWith(root+sep))throw new Error('Keep private scan input outside repository');privateNeedles=JSON.parse(await readFile(p,'utf8'));}
+const patterns=[['private_key',/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],['github_token',/\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})\b/],['jwt',/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/],['supabase_secret',/\bsb_secret_[A-Za-z0-9_-]{20,}\b/],['meta_access',/\b(?:EAA|IGQV|IGAA)[A-Za-z0-9_-]{50,}\b/],['personal_path',/\/(?:Users|home)\/[A-Za-z0-9_.-]+\//]];
+async function walk(dir){for(const entry of await readdir(dir,{withFileTypes:true})){if(ignored.has(entry.name))continue;const path=resolve(dir,entry.name),name=relative(root,path);if(entry.isSymbolicLink()){findings.push({file:name,rule:'symlink'});continue;}if(entry.isDirectory()){await walk(path);continue;}if(!entry.isFile())continue;count++;if((entry.name.startsWith('.env')&&entry.name!=='.env.example')||entry.name.startsWith('.dev.vars')||/\.(?:log|pem|key|sqlite|db|zip|tar|gz)$/.test(entry.name)){findings.push({file:name,rule:'sensitive_file'});continue;}const b=await readFile(path),text=b.toString('utf8');for(const [rule,re]of patterns)if(re.test(rule==='personal_path'?text.replaceAll('/home/node/','/CONTAINER_HOME/'):text))findings.push({file:name,rule});for(let i=0;i<privateNeedles.length;i++){const needle=privateNeedles[i];if(typeof needle==='string'&&needle.length>=8&&b.includes(Buffer.from(needle)))findings.push({file:name,rule:'private_value_'+i});}}}
+await walk(root);console.log(JSON.stringify({files:count,privateValuesChecked:privateNeedles.length,findings},null,2));if(findings.length)process.exitCode=1;

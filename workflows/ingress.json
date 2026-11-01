@@ -1,0 +1,208 @@
+{
+  "name": "Comment to DM · Recepcion Meta",
+  "nodes": [
+    {
+      "id": "0b555ef8-0d6b-5bf2-a23f-bd73d250a455",
+      "name": "Meta GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "comment-to-dm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "comment-to-dm-ingress-get"
+    },
+    {
+      "id": "00766c5d-72a8-5a80-b69c-815d78563798",
+      "name": "Validar verificacion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_verify",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {p_mode:$json.query['hub.mode'] || '',p_token:$json.query['hub.verify_token'] || '',p_challenge:$json.query['hub.challenge'] || ''} }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    },
+    {
+      "id": "a0d87fc6-238d-5e73-a50f-e89fce2ecee5",
+      "name": "Responder verificacion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      }
+    },
+    {
+      "id": "7b6fcefc-9a6d-5065-bbba-b2ad4d48c036",
+      "name": "Meta POST",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "comment-to-dm",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "webhookId": "comment-to-dm-ingress-post"
+    },
+    {
+      "id": "1590c9d3-0818-5d7f-a565-90fe5eddc2f5",
+      "name": "Conservar bytes originales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const raw=await this.helpers.getBinaryDataBuffer(0,'data'); return [{json:{p_raw_base64:raw.toString('base64'),p_signature:$input.first().json.headers['x-hub-signature-256'] || ''}}];"
+      }
+    },
+    {
+      "id": "3dee81d3-af2f-5b46-8875-1facb9c2e653",
+      "name": "Validar firma y encolar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_ingest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    },
+    {
+      "id": "7f2f5cbe-d6ce-50ad-b663-642ee7b330c3",
+      "name": "Confirmar recepcion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        750,
+        240
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.code }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Meta GET": {
+      "main": [
+        [
+          {
+            "node": "Validar verificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar verificacion": {
+      "main": [
+        [
+          {
+            "node": "Responder verificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta POST": {
+      "main": [
+        [
+          {
+            "node": "Conservar bytes originales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conservar bytes originales": {
+      "main": [
+        [
+          {
+            "node": "Validar firma y encolar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar firma y encolar": {
+      "main": [
+        [
+          {
+            "node": "Confirmar recepcion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 60
+  }
+}

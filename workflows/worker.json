@@ -1,0 +1,395 @@
+{
+  "name": "Comment to DM · Entregas",
+  "nodes": [
+    {
+      "id": "bdd6006a-161d-55ce-8afa-6e42081322d0",
+      "name": "Cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "642b075c-ef90-5dc4-9f39-167c983350b5",
+      "name": "Reclamar entrega",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        250,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    },
+    {
+      "id": "1b5f5949-27d4-5ca1-9f89-489401f7a1d8",
+      "name": "Es simulacion",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.mode }}",
+              "operation": "equal",
+              "value2": "simulation"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "263c7605-513d-5fbc-8300-2037518430a9",
+      "name": "Registrar simulacion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_finish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {p_job_id:$json.job_id,p_claim_token:$json.claim_token,p_status:'simulated'} }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    },
+    {
+      "id": "f2797ebd-2c00-562b-912c-6bef49506515",
+      "name": "Enviar respuesta privada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.instagram.com/__GRAPH_VERSION__/' + $json.owner_id + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { comment_id: $json.comment_id }, message: { text: $json.message } }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__META_CREDENTIAL_ID__",
+          "name": "Comment to DM · Instagram"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "267a85bf-33a3-5309-91c8-1a2df423f6c4",
+      "name": "Clasificar resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const r=$input.first().json,j=$('Reclamar entrega').first().json,b=r.body||r;const ok=typeof b.message_id==='string'&&(!r.statusCode||(r.statusCode>=200&&r.statusCode<300));const rejected=r.statusCode>=400&&r.statusCode<500;return [{json:{p_job_id:j.job_id,p_claim_token:j.claim_token,p_status:ok?'sent':rejected?'failed':'uncertain',p_message_id:ok?b.message_id:null,p_error_code:ok?null:(rejected?'META_REJECTED':'DELIVERY_UNCERTAIN')}}];"
+      }
+    },
+    {
+      "id": "003eaa3e-accf-5f1a-b671-7f50c641f920",
+      "name": "Guardar resultado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_finish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    },
+    {
+      "id": "0f0c28b4-6d2a-5b80-9e01-4e425aae8ef3",
+      "name": "Reclamar respuesta publica",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        250,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_reply_claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    },
+    {
+      "id": "d59213c6-bc1b-52b9-ab86-6864c830823a",
+      "name": "Responder comentario",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.instagram.com/__GRAPH_VERSION__/' + $json.comment_id + '/replies' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.reply_text }) }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__META_CREDENTIAL_ID__",
+          "name": "Comment to DM · Instagram"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "4f5557b1-2ea5-5c31-8d4e-a48c822859ba",
+      "name": "Clasificar respuesta publica",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        500
+      ],
+      "parameters": {
+        "jsCode": "const r=$input.first().json,j=$('Reclamar respuesta publica').first().json,b=r.body||r;const ok=typeof b.id==='string'&&(!r.statusCode||(r.statusCode>=200&&r.statusCode<300));const rejected=r.statusCode>=400&&r.statusCode<500;return [{json:{p_reply_job_id:j.reply_job_id,p_claim_token:j.reply_claim_token,p_status:ok?'sent':rejected?'failed':'uncertain',p_reply_id:ok?b.id:null,p_error_code:ok?null:(rejected?'META_REJECTED':'DELIVERY_UNCERTAIN')}}];"
+      }
+    },
+    {
+      "id": "36d59916-88ab-52f0-b2c0-73aedf1ac506",
+      "name": "Guardar respuesta publica",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "__SUPABASE_URL__/rest/v1/rpc/ig_delivery_reply_finish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "__SUPABASE_CREDENTIAL_ID__",
+          "name": "Comment to DM · Database"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada minuto": {
+      "main": [
+        [
+          {
+            "node": "Reclamar entrega",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reclamar respuesta publica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclamar entrega": {
+      "main": [
+        [
+          {
+            "node": "Es simulacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar respuesta privada": {
+      "main": [
+        [
+          {
+            "node": "Clasificar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar resultado": {
+      "main": [
+        [
+          {
+            "node": "Guardar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es simulacion": {
+      "main": [
+        [
+          {
+            "node": "Registrar simulacion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar respuesta privada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclamar respuesta publica": {
+      "main": [
+        [
+          {
+            "node": "Responder comentario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder comentario": {
+      "main": [
+        [
+          {
+            "node": "Clasificar respuesta publica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clasificar respuesta publica": {
+      "main": [
+        [
+          {
+            "node": "Guardar respuesta publica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "executionTimeout": 120,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

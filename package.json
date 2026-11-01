@@ -1,0 +1,28 @@
+{
+  "name": "instagram-comment-to-dm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.2 <25"
+  },
+  "scripts": {
+    "start": "node --env-file=.env panel/server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:database": "node tests/database.mjs",
+    "test:security": "node --test tests/security.test.mjs",
+    "setup": "node scripts/configure.mjs",
+    "doctor": "node --env-file=.env scripts/doctor.mjs",
+    "deploy:n8n": "node --env-file=.env scripts/deploy-n8n.mjs",
+    "scan": "node scripts/scan-release.mjs",
+    "release:check": "npm test && npm run scan",
+    "test:integration": "node tests/database.mjs",
+    "test:n8n": "node tests/n8n-lab.mjs",
+    "test:container": "node tests/container.mjs"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.11.0-beta.19",
+    "pg": "8.23.1"
+  }
+}

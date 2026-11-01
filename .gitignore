@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.dev.vars*
+node_modules/
+state/
+coverage/
+supabase/.temp/
+*.log
+*.tar.gz
+*.zip
+.DS_Store

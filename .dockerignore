@@ -1,0 +1,5 @@
+**
+!panel/
+!panel/**
+!package.json
+!Dockerfile
