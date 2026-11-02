@@ -12,6 +12,7 @@ Fecha: 2026-11-01. Evaluación técnica asistida por IA del paquete comunitario 
 - npm audit: cero vulnerabilidades conocidas reportadas en las dependencias fijadas a la fecha de revisión. Esto no cubre todas las vulnerabilidades del SO o de servicios externos.
 - Escaneo del inventario del paquete y comparación local con valores privados conocidos, sin imprimirlos ni incluirlos en el repositorio. No se hallaron coincidencias en el contenido preparado. Una lista conocida no prueba ausencia de cualquier otro dato sensible imaginable.
 - Instalación desde un clon limpio: `npm ci --ignore-scripts`, las 28 pruebas de aplicación y las 66 comprobaciones PostgreSQL pasaron sin conexiones de producción. El inventario de publicación contiene 51 archivos; la comparación con 40 valores privados conocidos pasó también sobre los blobs y metadatos del historial Git que se publicará. La lista privada de comparación no forma parte del proyecto.
+- [CI de GitHub completado](https://github.com/pedrosgutierrezv-cell/instagram-comment-to-dm/actions/runs/41364786655): instalación limpia en Linux con Node 24.22.2, pruebas, migración, escáner y auditoría de dependencias. El repositorio público tiene secret scanning, push protection, alertas de dependencias y reportes privados de vulnerabilidades activados. Estas protecciones no reconocen todos los posibles formatos de secretos.
 
 ## Hallazgos corregidos antes de publicar
 
